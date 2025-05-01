@@ -1,64 +1,55 @@
-// routes/servicios.js
+// routes/servicios.js (Refactorizado para usar Controladores y Validadores)
 const express = require('express');
 const router = express.Router();
-const db = require('../db');
 
-// GET /servicios – obtener todos los servicios
-router.get('/', (req, res) => {
-  const sql = 'SELECT * FROM servicios';
-  db.query(sql, (err, results) => {
-    if (err) {
-      console.error('Error al obtener servicios:', err);
-      return res.status(500).json({ mensaje: 'Error del servidor' });
-    }
+// --- Importar Controladores ---
+const servicioController = require('../controllers/servicioController'); // Ajusta la ruta si es necesario
 
-    res.json(results); // devolvemos los servicios como JSON
-  });
-});
+// --- Importar Validadores ---
+// Asegúrate de que los nombres coincidan con los exportados en servicioValidator.js
+const {
+    validateCreateServicio,
+    validateUpdateServicio,
+    validateParamId
+    // Importa otros validadores si los creaste (ej. para query params)
+} = require('../validators/servicioValidator'); // Ajusta la ruta si es necesario
 
-// POST /servicios – agregar un nuevo servicio
-router.post('/', (req, res) => {
-  const { nombre, descripcion, precio, duracion } = req.body;
+// --- Importar Middleware de Manejo de Errores de Validación ---
+const { handleValidationErrors } = require('../middlewares/validationMiddleware'); // Ajusta la ruta si es necesario
 
-  if (!nombre || !descripcion || !precio || !duracion) {
-    return res.status(400).json({ mensaje: 'Faltan datos del servicio' });
-  }
+// --- Definición de Rutas ---
 
-  const sql = 'INSERT INTO servicios (nombre, descripcion, precio, duracion) VALUES (?, ?, ?, ?)';
-  db.query(sql, [nombre, descripcion, precio, duracion], (err, result) => {
-    if (err) {
-      console.error('Error al agregar servicio:', err);
-      return res.status(500).json({ mensaje: 'Error del servidor' });
-    }
+// GET /servicios – obtener todos los servicios (con filtros opcionales)
+// No necesita validación específica aquí a menos que valides los query params
+router.get('/', servicioController.getAllServicios);
 
-    res.status(201).json({ mensaje: 'Servicio agregado con éxito', id: result.insertId });
-  });
-});
+// GET /servicios/:id – obtener un servicio específico por ID
+router.get('/:id',
+    validateParamId,          // 1. Validar que el ID en la URL sea un entero positivo
+    handleValidationErrors,   // 2. Manejar errores si la validación falla
+    servicioController.getServicioById // 3. Ejecutar el controlador si el ID es válido
+);
 
-// PUT /servicios/:id – actualizar un servicio existente
-router.put('/:id', (req, res) => {
-  const { id } = req.params;
-  const { nombre, precio, duracion } = req.body;
+// POST /servicios – agregar un nuevo servicio (con posible subservicio)
+router.post('/',
+    validateCreateServicio,   // 1. Validar el cuerpo (nombre, precio, parent_id, etc.)
+    handleValidationErrors,   // 2. Manejar errores de validación
+    servicioController.createServicio // 3. Ejecutar el controlador
+);
 
-  if (!nombre || !precio || !duracion) {
-    return res.status(400).json({ mensaje: 'Faltan datos para actualizar el servicio' });
-  }
+// PATCH /servicios/:id – actualizar parcialmente un servicio existente
+router.patch('/:id',
+    validateUpdateServicio,   // 1. Validar ID de param y campos opcionales del cuerpo
+    handleValidationErrors,   // 2. Manejar errores de validación
+    servicioController.updateServicio // 3. Ejecutar el controlador
+);
 
-  const sql = `UPDATE servicios SET nombre = ?, precio = ?, duracion = ? WHERE id = ?`;
-
-  db.query(sql, [nombre, precio, duracion, id], (err, result) => {
-    if (err) {
-      console.error('Error al actualizar el servicio:', err);
-      return res.status(500).json({ mensaje: 'Error del servidor' });
-    }
-
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ mensaje: 'Servicio no encontrado' });
-    }
-
-    res.status(200).json({ mensaje: 'Servicio actualizado correctamente' });
-  });
-});
+// DELETE /servicios/:id – eliminar un servicio
+router.delete('/:id',
+    validateParamId,          // 1. Validar que el ID en la URL sea un entero positivo
+    handleValidationErrors,   // 2. Manejar errores si la validación falla
+    servicioController.deleteServicio // 3. Ejecutar el controlador (que tiene lógica adicional de verificación)
+);
 
 
 module.exports = router;
